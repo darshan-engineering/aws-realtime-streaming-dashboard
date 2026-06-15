@@ -1,0 +1,17 @@
+venv
+
+*.zip
+
+# Terraform files
+.terraform/
+.terraformrc
+*.tfstate
+*.tfstate.backup
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+plan.out
+.terraform.lock.hcl

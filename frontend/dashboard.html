@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kitchen Display</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0d0d0d;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 1px;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #555;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #555;
+    }
+
+    .dot.live {
+      background: #22c55e;
+      box-shadow: 0 0 6px #22c55e;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .columns {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .column-header {
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #444;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .order-card {
+      background: #141414;
+      border: 1px solid #1e1e1e;
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 12px;
+      animation: slideIn 0.3s ease;
+      transition: border-color 0.3s;
+    }
+
+    .order-card.new      { border-left: 3px solid #eab308; }
+    .order-card.preparing { border-left: 3px solid #3b82f6; }
+    .order-card.ready    { border-left: 3px solid #22c55e; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .order-id {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+
+    .table-badge {
+      font-size: 11px;
+      background: #1e1e1e;
+      color: #888;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .items {
+      list-style: none;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.8;
+    }
+
+    .items li::before {
+      content: '· ';
+      color: #444;
+    }
+
+    .time {
+      font-size: 11px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    .empty {
+      font-size: 13px;
+      color: #2a2a2a;
+      padding: 20px 0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🍽️ Kitchen Display</h1>
+  <div class="status-bar">
+    <div class="dot" id="status-dot"></div>
+    <span id="status-text">Connecting...</span>
+  </div>
+</header>
+
+<div class="columns">
+  <div>
+    <div class="column-header">🟡 New</div>
+    <div id="col-new"></div>
+  </div>
+  <div>
+    <div class="column-header">🔵 Preparing</div>
+    <div id="col-preparing"></div>
+  </div>
+  <div>
+    <div class="column-header">🟢 Ready</div>
+    <div id="col-ready"></div>
+  </div>
+</div>
+
+<script>
+  // ── CONFIG — replace with your actual URLs ──────────────────────────────
+  const WS_URL   = '<your-websocket-url>/production';
+  const REST_URL = '<your-rest-invoke-url>/state';
+  // ────────────────────────────────────────────────────────────────────────
+
+  const orders = {};  // entity_id → order object
+
+  const statusDot  = document.getElementById('status-dot');
+  const statusText = document.getElementById('status-text');
+
+  function setStatus(live, text) {
+    statusDot.className = live ? 'dot live' : 'dot';
+    statusText.textContent = text;
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function renderAll() {
+    const cols = { NEW: 'col-new', PREPARING: 'col-preparing', READY: 'col-ready' };
+    Object.values(cols).forEach(id => document.getElementById(id).innerHTML = '');
+
+    const sorted = Object.values(orders).sort(
+      (a, b) => new Date(a.placed_at) - new Date(b.placed_at)
+    );
+
+    for (const order of sorted) {
+      const status = (order.status || 'NEW').toUpperCase();
+      const colId = cols[status];
+      if (!colId) continue;
+
+      const card = document.createElement('div');
+      card.className = `order-card ${status.toLowerCase()}`;
+      card.id = `card-${order.entity_id}`;
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="order-id">${order.entity_id}</span>
+          <span class="table-badge">${order.table_no || '—'}</span>
+        </div>
+        <ul class="items">
+          ${(order.items || []).map(i => `<li>${i}</li>`).join('')}
+        </ul>
+        <div class="time">Placed ${formatTime(order.placed_at)}</div>
+      `;
+      document.getElementById(colId).appendChild(card);
+    }
+
+    // Show empty state per column
+    Object.entries(cols).forEach(([status, colId]) => {
+      const col = document.getElementById(colId);
+      if (!col.children.length) {
+        col.innerHTML = '<div class="empty">No orders</div>';
+      }
+    });
+  }
+
+  function applyUpdate(order) {
+    orders[order.entity_id] = order;
+    renderAll();
+  }
+
+  // Fetch current orders on load
+  fetch(REST_URL)
+    .then(r => r.json())
+    .then(items => {
+      items.forEach(o => { orders[o.entity_id] = o; });
+      renderAll();
+    })
+    .catch(() => renderAll());
+
+  // WebSocket connection with auto-reconnect
+  function connect() {
+    setStatus(false, 'Connecting...');
+    const ws = new WebSocket(WS_URL);
+
+    ws.onopen    = () => setStatus(true, 'Live');
+    ws.onmessage = (e) => applyUpdate(JSON.parse(e.data));
+    ws.onclose   = () => {
+      setStatus(false, 'Reconnecting in 3s...');
+      setTimeout(connect, 3000);
+    };
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+</script>
+</body>
+</html>
