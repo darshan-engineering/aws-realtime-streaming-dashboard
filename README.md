@@ -1,7 +1,6 @@
 # 📊 Real-Time Streaming Dashboard
 
-*Live data pipeline using Kinesis Data Streams, Lambda, DynamoDB, and WebSocket API Gateway*
-
+_Live data pipeline using Kinesis Data Streams, Lambda, DynamoDB, and WebSocket API Gateway_
 
 ---
 
@@ -72,13 +71,13 @@ REST API (GET /state)            Kitchen Display Screen
 
 ## ✅ How Our Solution Solves the Problem
 
-| Problem | Our Solution |
-|---------|-------------|
-| Kitchen misses orders — manual refresh | WebSocket push — every screen updates the moment an order is placed |
-| Status updates are manual | Each status change is an event in Kinesis — pushed to all screens instantly |
-| Lunch rush overwhelms the system | Kinesis buffers all incoming order events — Lambda processes at a controlled rate, nothing is lost |
-| No push mechanism in REST | WebSocket API Gateway — persistent connection, server pushes without being asked |
-| Screen loads slowly during rush | REST `GET /state` returns current snapshot instantly on load — WebSocket handles all updates after |
+| Problem                                | Our Solution                                                                                       |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Kitchen misses orders — manual refresh | WebSocket push — every screen updates the moment an order is placed                                |
+| Status updates are manual              | Each status change is an event in Kinesis — pushed to all screens instantly                        |
+| Lunch rush overwhelms the system       | Kinesis buffers all incoming order events — Lambda processes at a controlled rate, nothing is lost |
+| No push mechanism in REST              | WebSocket API Gateway — persistent connection, server pushes without being asked                   |
+| Screen loads slowly during rush        | REST `GET /state` returns current snapshot instantly on load — WebSocket handles all updates after |
 
 > 📖 For deep notes on Kinesis, WebSocket API Gateway, the streaming pattern, and how this scales to Hotstar-level traffic — see [`docs/concepts.md`](./docs/concepts.md)
 
@@ -86,15 +85,15 @@ REST API (GET /state)            Kitchen Display Screen
 
 ## ☁️ AWS Services Used
 
-| Service | Role |
-|---------|------|
-| **Kinesis Data Streams** | Ingests order events — buffers them, guarantees ordering per order ID |
+| Service                       | Role                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| **Kinesis Data Streams**      | Ingests order events — buffers them, guarantees ordering per order ID                      |
 | **Lambda (stream processor)** | Triggered by Kinesis — processes order events, updates DynamoDB, pushes to kitchen screens |
-| **DynamoDB** | Stores active order state — queried on initial screen load |
-| **WebSocket API Gateway** | Manages persistent kitchen screen connections — Lambda posts updates through it |
-| **API Gateway (REST)** | `GET /state` endpoint — returns all active orders for initial screen load |
-| **IAM** | Least-privilege roles — each Lambda gets only the permissions it needs |
-| **CloudWatch** | Logs, metrics, and Kinesis iterator age monitoring |
+| **DynamoDB**                  | Stores active order state — queried on initial screen load                                 |
+| **WebSocket API Gateway**     | Manages persistent kitchen screen connections — Lambda posts updates through it            |
+| **API Gateway (REST)**        | `GET /state` endpoint — returns all active orders for initial screen load                  |
+| **IAM**                       | Least-privilege roles — each Lambda gets only the permissions it needs                     |
+| **CloudWatch**                | Logs, metrics, and Kinesis iterator age monitoring                                         |
 
 ---
 
@@ -130,22 +129,24 @@ Same flow — producer sends a status update event, Lambda updates DynamoDB, pus
 ## 📄 DynamoDB Tables
 
 **`connections` table** — tracks active kitchen screen connections:
+
 ```json
 {
-  "connection_id": "abc123==",
-  "connected_at": "2026-04-26T08:00:00Z"
+    "connection_id": "abc123==",
+    "connected_at": "2026-04-26T08:00:00Z"
 }
 ```
 
 **`stream-state` table** — stores current state of each active order:
+
 ```json
 {
-  "entity_id": "ORD-0042",
-  "table_no": "T7",
-  "items": ["Butter Chicken", "Naan x2", "Dal Makhani"],
-  "status": "PREPARING",
-  "placed_at": "2026-04-26T12:34:00Z",
-  "last_updated": "2026-04-26T12:35:10Z"
+    "entity_id": "ORD-0042",
+    "table_no": "T7",
+    "items": ["Butter Chicken", "Naan x2", "Dal Makhani"],
+    "status": "PREPARING",
+    "placed_at": "2026-04-26T12:34:00Z",
+    "last_updated": "2026-04-26T12:35:10Z"
 }
 ```
 
@@ -153,13 +154,13 @@ Same flow — producer sends a status update event, Lambda updates DynamoDB, pus
 
 ## 🛡️ Design Decisions
 
-| Decision | Reasoning |
-|----------|-----------|
-| Kinesis over SQS | Kinesis preserves event ordering per order ID (partition key) and supports multiple consumers. SQS deletes messages on consumption — no replay, no ordering guarantee |
-| WebSocket over polling | Polling adds latency equal to the poll interval. During lunch rush, a 5-second poll means 5-second-old order data. WebSocket gives sub-second push |
-| Store connection IDs in DynamoDB | Lambda is stateless — it needs a persistent store to know which screens are connected to push updates to |
-| Lambda triggered by Kinesis | Decouples the POS from the kitchen display. Orders flow into Kinesis at any rate; Lambda processes at its own pace. Kinesis absorbs lunch rush spikes |
-| Separate REST endpoint for initial load | WebSocket is for live updates only. A REST call on screen load gives the kitchen the current active orders before live updates begin |
+| Decision                                | Reasoning                                                                                                                                                             |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Kinesis over SQS                        | Kinesis preserves event ordering per order ID (partition key) and supports multiple consumers. SQS deletes messages on consumption — no replay, no ordering guarantee |
+| WebSocket over polling                  | Polling adds latency equal to the poll interval. During lunch rush, a 5-second poll means 5-second-old order data. WebSocket gives sub-second push                    |
+| Store connection IDs in DynamoDB        | Lambda is stateless — it needs a persistent store to know which screens are connected to push updates to                                                              |
+| Lambda triggered by Kinesis             | Decouples the POS from the kitchen display. Orders flow into Kinesis at any rate; Lambda processes at its own pace. Kinesis absorbs lunch rush spikes                 |
+| Separate REST endpoint for initial load | WebSocket is for live updates only. A REST call on screen load gives the kitchen the current active orders before live updates begin                                  |
 
 ---
 
@@ -180,7 +181,7 @@ Open the file, set `WS_URL` and `REST_URL` at the top of the script, then open i
 
 ## 🎬 Demo
 
-https://github.com/user-attachments/assets/dc9b8d95-fe6a-4d7f-9783-b092786a6b48
+https://github.com/user-attachments/assets/63095a21-7b0a-49dd-9093-4aa321b6fa05
 
 ---
 
